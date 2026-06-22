@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Factory, Lock, Mail, ArrowRight } from 'lucide-react';
+import { Lock, Mail, ArrowRight } from 'lucide-react';
+import logo from '../assets/logo.png';
 
 import api from '../api/api';
 
@@ -36,8 +37,12 @@ const Login = () => {
     <div className="container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
       <div className="glass-panel animate-fade-in" style={{ width: '100%', maxWidth: '400px', padding: '2.5rem' }}>
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '64px', height: '64px', borderRadius: '16px', background: 'linear-gradient(135deg, var(--accent-color), var(--accent-hover))', marginBottom: '1rem' }}>
-            <Factory color="white" size={32} />
+          <div style={{ marginBottom: '1.25rem' }}>
+            <img
+              src={logo}
+              alt="Apolo Logo"
+              style={{ height: '64px', width: 'auto', objectFit: 'contain' }}
+            />
           </div>
           <h2 style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>Factory Portal</h2>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Sign in to cost estimation module</p>
