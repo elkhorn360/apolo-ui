@@ -221,9 +221,11 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  const updateVariantName = async (id, newName, newModel, modelCode, variantCode) => {
+  const updateVariantName = async (id, newName, newModel, modelCode, variantCode, sizes) => {
     try {
-      const res = await api.put(`/variants/${id}`, { name: newName, modelName: newModel, modelCode, variantCode });
+      const payload = { name: newName, modelName: newModel, modelCode, variantCode };
+      if (sizes !== undefined) payload.sizes = sizes;
+      const res = await api.put(`/variants/${id}`, payload);
       setVariants(prev => prev.map(v => (v._id === id || v.id === id) ? res.data : v));
     } catch (err) {
       console.error('Error updating variant name:', err);

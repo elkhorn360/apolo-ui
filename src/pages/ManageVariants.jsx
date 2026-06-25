@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { Box, Plus, Trash2, Edit2, Save, X, Layout, Copy, Hammer } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 
-const INITIAL_FORM = { model: '', name: '', modelCode: '', variantCode: '' };
+const SHOE_SIZES = Array.from({ length: 18 }, (_, i) => 29 + i); // 29 to 46
+const INITIAL_FORM = { model: '', name: '', modelCode: '', variantCode: '', sizes: [] };
 
 const ManageVariants = () => {
   const { variants, addVariant, deleteVariant, updateVariantName, updateModelDetails, deleteModel } = useAppContext();
@@ -11,6 +12,7 @@ const ManageVariants = () => {
   const [editingId, setEditingId] = useState(null);
   const [editName, setEditName] = useState('');
   const [editVariantCode, setEditVariantCode] = useState('');
+  const [editSizes, setEditSizes] = useState([]);
   
   // Model editing state
   const [editingModelName, setEditingModelName] = useState(null);
@@ -20,6 +22,7 @@ const ManageVariants = () => {
   const [addingVariantToModel, setAddingVariantToModel] = useState(null);
   const [newVariantName, setNewVariantName] = useState('');
   const [newVariantCode, setNewVariantCode] = useState('');
+  const [newVariantSizes, setNewVariantSizes] = useState([]);
 
   const handleSave = async () => {
     if (!formData.model || !formData.name) {
@@ -32,6 +35,7 @@ const ManageVariants = () => {
       name: formData.name,
       modelCode: formData.modelCode,
       variantCode: formData.variantCode,
+      sizes: formData.sizes,
       labourAllocations: {},
       utilityAllocations: {},
       bom: []
@@ -48,6 +52,7 @@ const ManageVariants = () => {
       name: newVariantName,
       modelCode: variants.find(v => v.modelName === modelName)?.modelCode || '',
       variantCode: newVariantCode,
+      sizes: newVariantSizes,
       bom: [],
       labourAllocations: {},
       utilityAllocations: {}
@@ -55,6 +60,7 @@ const ManageVariants = () => {
     setAddingVariantToModel(null);
     setNewVariantName('');
     setNewVariantCode('');
+    setNewVariantSizes([]);
   };
 
   const handleDeleteVariant = (variant) => {
@@ -89,16 +95,18 @@ const ManageVariants = () => {
     setEditingId(variant._id || variant.id);
     setEditName(variant.name);
     setEditVariantCode(variant.variantCode || '');
+    setEditSizes(Array.isArray(variant.sizes) ? [...variant.sizes] : []);
   };
 
   const saveEdit = async (variant) => {
     if (!editName) return;
     await updateVariantName(
-      variant._id || variant.id, 
-      editName, 
-      variant.modelName, 
-      variant.modelCode, 
-      editVariantCode
+      variant._id || variant.id,
+      editName,
+      variant.modelName,
+      variant.modelCode,
+      editVariantCode,
+      editSizes
     );
     setEditingId(null);
   };
@@ -180,6 +188,82 @@ const ManageVariants = () => {
                   value={formData.variantCode} 
                   onChange={e => setFormData({...formData, variantCode: e.target.value})} 
                 />
+              </div>
+            </div>
+
+            {/* Size Selection */}
+            <div style={{ marginBottom: '1.5rem' }}>
+              <label style={{ fontSize: '0.85rem', display: 'block', marginBottom: '0.75rem' }}>
+                Available Sizes (EU)
+                <span style={{ color: 'var(--text-secondary)', fontWeight: 400, marginLeft: '0.5rem' }}>
+                  — {formData.sizes.length} selected
+                </span>
+              </label>
+              <div style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: '0.5rem'
+              }}>
+                {SHOE_SIZES.map(size => {
+                  const checked = formData.sizes.includes(size);
+                  return (
+                    <label
+                      key={size}
+                      title={`EU ${size}`}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        width: '46px',
+                        height: '36px',
+                        borderRadius: '8px',
+                        border: checked
+                          ? '2px solid var(--accent-color)'
+                          : '1px solid var(--border-color)',
+                        backgroundColor: checked
+                          ? 'rgba(99,102,241,0.18)'
+                          : 'rgba(255,255,255,0.04)',
+                        color: checked ? 'var(--accent-color)' : 'var(--text-secondary)',
+                        fontWeight: checked ? '700' : '400',
+                        fontSize: '0.82rem',
+                        cursor: 'pointer',
+                        userSelect: 'none',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => {
+                          const next = checked
+                            ? formData.sizes.filter(s => s !== size)
+                            : [...formData.sizes, size].sort((a, b) => a - b);
+                          setFormData({ ...formData, sizes: next });
+                        }}
+                        style={{ display: 'none' }}
+                      />
+                      {size}
+                    </label>
+                  );
+                })}
+              </div>
+              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  style={{ padding: '0.25rem 0.75rem', fontSize: '0.78rem' }}
+                  onClick={() => setFormData({ ...formData, sizes: [...SHOE_SIZES] })}
+                >
+                  Select All
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  style={{ padding: '0.25rem 0.75rem', fontSize: '0.78rem' }}
+                  onClick={() => setFormData({ ...formData, sizes: [] })}
+                >
+                  Clear
+                </button>
               </div>
             </div>
             <div style={{ display: 'flex', gap: '1rem' }}>
@@ -330,23 +414,75 @@ const ManageVariants = () => {
                       >
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', flex: 1 }}>
                           {isEditing ? (
-                            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                              <input 
-                                type="text" 
-                                value={editName}
-                                onChange={e => setEditName(e.target.value)}
-                                placeholder="Variant Name"
-                                style={{ width: '200px', padding: '0.25rem 0.6rem', fontSize: '0.9rem' }}
-                              />
-                              <input 
-                                type="text" 
-                                value={editVariantCode}
-                                onChange={e => setEditVariantCode(e.target.value)}
-                                placeholder="Variant Code"
-                                style={{ width: '120px', padding: '0.25rem 0.6rem', fontSize: '0.9rem' }}
-                              />
-                              <button onClick={() => saveEdit(variant)} style={{ color: 'var(--success-color)', background: 'none', border: 'none', cursor: 'pointer' }}><Save size={16} /></button>
-                              <button onClick={() => setEditingId(null)} style={{ color: 'var(--danger-color)', background: 'none', border: 'none', cursor: 'pointer' }}><X size={16} /></button>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                              {/* Name + Code row */}
+                              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                                <input 
+                                  type="text" 
+                                  value={editName}
+                                  onChange={e => setEditName(e.target.value)}
+                                  placeholder="Variant Name"
+                                  style={{ width: '200px', padding: '0.25rem 0.6rem', fontSize: '0.9rem' }}
+                                />
+                                <input 
+                                  type="text" 
+                                  value={editVariantCode}
+                                  onChange={e => setEditVariantCode(e.target.value)}
+                                  placeholder="Variant Code"
+                                  style={{ width: '120px', padding: '0.25rem 0.6rem', fontSize: '0.9rem' }}
+                                />
+                                <button onClick={() => saveEdit(variant)} style={{ color: 'var(--success-color)', background: 'none', border: 'none', cursor: 'pointer' }}><Save size={16} /></button>
+                                <button onClick={() => setEditingId(null)} style={{ color: 'var(--danger-color)', background: 'none', border: 'none', cursor: 'pointer' }}><X size={16} /></button>
+                              </div>
+                              {/* Size checkboxes */}
+                              <div>
+                                <label style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginBottom: '0.35rem', display: 'block' }}>
+                                  Sizes (EU) — {editSizes.length} selected
+                                </label>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
+                                  {SHOE_SIZES.map(size => {
+                                    const checked = editSizes.includes(size);
+                                    return (
+                                      <label
+                                        key={size}
+                                        style={{
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          width: '38px',
+                                          height: '30px',
+                                          borderRadius: '7px',
+                                          border: checked
+                                            ? '2px solid var(--accent-color)'
+                                            : '1px solid var(--border-color)',
+                                          backgroundColor: checked
+                                            ? 'rgba(99,102,241,0.18)'
+                                            : 'rgba(255,255,255,0.03)',
+                                          color: checked ? 'var(--accent-color)' : 'var(--text-secondary)',
+                                          fontWeight: checked ? '700' : '400',
+                                          fontSize: '0.76rem',
+                                          cursor: 'pointer',
+                                          userSelect: 'none',
+                                          transition: 'all 0.15s ease'
+                                        }}
+                                      >
+                                        <input
+                                          type="checkbox"
+                                          checked={checked}
+                                          onChange={() => {
+                                            const next = checked
+                                              ? editSizes.filter(s => s !== size)
+                                              : [...editSizes, size].sort((a, b) => a - b);
+                                            setEditSizes(next);
+                                          }}
+                                          style={{ display: 'none' }}
+                                        />
+                                        {size}
+                                      </label>
+                                    );
+                                  })}
+                                </div>
+                              </div>
                             </div>
                           ) : (
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -395,25 +531,76 @@ const ManageVariants = () => {
                       gap: '1rem',
                       borderTop: '1px solid rgba(16, 185, 129, 0.2)'
                     }}>
-                      <div style={{ flex: 1, display: 'flex', gap: '1rem' }}>
-                        <div style={{ flex: 1 }}>
-                          <label style={{ fontSize: '0.75rem', color: 'var(--success-color)', marginBottom: '0.25rem', display: 'block' }}>New Variant Name</label>
-                          <input 
-                            autoFocus
-                            placeholder="e.g. Suede / Midnight Blue" 
-                            value={newVariantName}
-                            onChange={e => setNewVariantName(e.target.value)}
-                            style={{ width: '100%', fontSize: '1rem', padding: '0.5rem 0.75rem' }}
-                          />
+                      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                        <div style={{ display: 'flex', gap: '1rem' }}>
+                          <div style={{ flex: 1 }}>
+                            <label style={{ fontSize: '0.75rem', color: 'var(--success-color)', marginBottom: '0.25rem', display: 'block' }}>New Variant Name</label>
+                            <input 
+                              autoFocus
+                              placeholder="e.g. Suede / Midnight Blue" 
+                              value={newVariantName}
+                              onChange={e => setNewVariantName(e.target.value)}
+                              style={{ width: '100%', fontSize: '1rem', padding: '0.5rem 0.75rem' }}
+                            />
+                          </div>
+                          <div style={{ width: '150px' }}>
+                            <label style={{ fontSize: '0.75rem', color: 'var(--success-color)', marginBottom: '0.25rem', display: 'block' }}>Variant Code</label>
+                            <input 
+                              placeholder="e.g. SUE-MB" 
+                              value={newVariantCode}
+                              onChange={e => setNewVariantCode(e.target.value)}
+                              style={{ width: '100%', fontSize: '1rem', padding: '0.5rem 0.75rem' }}
+                            />
+                          </div>
                         </div>
-                        <div style={{ width: '150px' }}>
-                          <label style={{ fontSize: '0.75rem', color: 'var(--success-color)', marginBottom: '0.25rem', display: 'block' }}>Variant Code</label>
-                          <input 
-                            placeholder="e.g. SUE-MB" 
-                            value={newVariantCode}
-                            onChange={e => setNewVariantCode(e.target.value)}
-                            style={{ width: '100%', fontSize: '1rem', padding: '0.5rem 0.75rem' }}
-                          />
+                        {/* Size checkboxes for quick-add */}
+                        <div>
+                          <label style={{ fontSize: '0.75rem', color: 'var(--success-color)', marginBottom: '0.4rem', display: 'block' }}>
+                            Sizes (EU) — {newVariantSizes.length} selected
+                          </label>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                            {SHOE_SIZES.map(size => {
+                              const checked = newVariantSizes.includes(size);
+                              return (
+                                <label
+                                  key={size}
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    width: '40px',
+                                    height: '32px',
+                                    borderRadius: '7px',
+                                    border: checked
+                                      ? '2px solid var(--success-color)'
+                                      : '1px solid var(--border-color)',
+                                    backgroundColor: checked
+                                      ? 'rgba(16,185,129,0.15)'
+                                      : 'rgba(255,255,255,0.03)',
+                                    color: checked ? 'var(--success-color)' : 'var(--text-secondary)',
+                                    fontWeight: checked ? '700' : '400',
+                                    fontSize: '0.78rem',
+                                    cursor: 'pointer',
+                                    userSelect: 'none',
+                                    transition: 'all 0.15s ease'
+                                  }}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={checked}
+                                    onChange={() => {
+                                      const next = checked
+                                        ? newVariantSizes.filter(s => s !== size)
+                                        : [...newVariantSizes, size].sort((a, b) => a - b);
+                                      setNewVariantSizes(next);
+                                    }}
+                                    style={{ display: 'none' }}
+                                  />
+                                  {size}
+                                </label>
+                              );
+                            })}
+                          </div>
                         </div>
                       </div>
                       <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1.25rem' }}>
