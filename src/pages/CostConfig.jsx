@@ -8,7 +8,8 @@ const CostConfig = () => {
   const { 
     variants, rawMaterials, manpowerRates, utilityRates,
     getBomForVariant, addMaterialToBom, updateMaterialInBom, deleteMaterialFromBom,
-    updateVariantLabourAllocations, updateVariantUtilityAllocations
+    addLabourToVariant, updateLabourInVariant, deleteLabourFromVariant,
+    addUtilityToVariant, updateUtilityInVariant, deleteUtilityFromVariant
   } = useAppContext();
   
   const [selectedVariantId, setSelectedVariantId] = useState(null);
@@ -19,12 +20,14 @@ const CostConfig = () => {
   const [formData, setFormData] = useState(INITIAL_FORM);
 
   // Manpower State
-  const [labourAllocations, setLabourAllocations] = useState({});
-  const [isLabourSaved, setIsLabourSaved] = useState(false);
+  const [isAddingLabour, setIsAddingLabour] = useState(false);
+  const [editingLabourId, setEditingLabourId] = useState(null);
+  const [labourFormData, setLabourFormData] = useState({ stageId: '', quantity: '' });
 
   // Utility State
-  const [utilityAllocations, setUtilityAllocations] = useState({});
-  const [isUtilitySaved, setIsUtilitySaved] = useState(false);
+  const [isAddingUtility, setIsAddingUtility] = useState(false);
+  const [editingUtilityId, setEditingUtilityId] = useState(null);
+  const [utilityFormData, setUtilityFormData] = useState({ utilityId: '', quantity: '' });
 
   useEffect(() => {
     if (variants.length > 0 && !selectedVariantId) {
@@ -35,34 +38,14 @@ const CostConfig = () => {
   const bom = getBomForVariant(selectedVariantId);
   const variant = variants.find(v => (v._id === selectedVariantId || v.id === selectedVariantId));
 
-  useEffect(() => {
-    // Sync Manpower
-    const initialManpower = variant && variant.labourAllocations 
-      ? (variant.labourAllocations instanceof Map ? Object.fromEntries(variant.labourAllocations) : variant.labourAllocations)
-      : {};
-    const finalManpower = {};
-    manpowerRates.forEach(rate => {
-      finalManpower[rate.id] = initialManpower[rate.id] !== undefined ? initialManpower[rate.id] : rate.unitCost;
-    });
-    setLabourAllocations(finalManpower);
-    
-    // Sync Utility
-    const initialUtility = variant && variant.utilityAllocations 
-      ? (variant.utilityAllocations instanceof Map ? Object.fromEntries(variant.utilityAllocations) : variant.utilityAllocations)
-      : {};
-    const finalUtility = {};
-    utilityRates.forEach(rate => {
-      finalUtility[rate.id] = initialUtility[rate.id] !== undefined ? initialUtility[rate.id] : rate.unitCost;
-    });
-    setUtilityAllocations(finalUtility);
-  }, [selectedVariantId, variant, manpowerRates, utilityRates]);
-
   const handleVariantChange = (e) => {
     setSelectedVariantId(e.target.value);
     setEditingMatId(null);
     setIsAddingMat(false);
-    setIsLabourSaved(false);
-    setIsUtilitySaved(false);
+    setEditingLabourId(null);
+    setIsAddingLabour(false);
+    setEditingUtilityId(null);
+    setIsAddingUtility(false);
   };
 
   /* ----- MATERIAL ACTIONS ----- */
@@ -119,58 +102,92 @@ const CostConfig = () => {
   };
 
   /* ----- LABOUR ACTIONS ----- */
-  const handleLabourChange = (stageId, value) => {
-    setLabourAllocations(prev => {
-      const newAllocs = { ...prev };
-      newAllocs[stageId] = value;
-      return newAllocs;
+  const handleEditLabourClick = (alloc) => {
+    setEditingLabourId(alloc._id || alloc.id);
+    setLabourFormData({
+      stageId: alloc.stageId,
+      quantity: alloc.quantity,
     });
-    setIsLabourSaved(false);
+    setIsAddingLabour(false);
+  };
+
+  const handleDeleteLabourClick = (id) => {
+    if (confirm('Are you sure you want to remove this labour stage allocation?')) {
+      deleteLabourFromVariant(selectedVariantId, id);
+    }
   };
 
   const handleSaveLabour = () => {
-    const payload = {};
-    Object.entries(labourAllocations).forEach(([k, v]) => {
-      if (v !== '') payload[k] = parseFloat(v);
-    });
-    updateVariantLabourAllocations(selectedVariantId, payload);
-    setIsLabourSaved(true);
-    setTimeout(() => setIsLabourSaved(false), 3000);
+    if (!labourFormData.stageId || labourFormData.quantity === '') {
+      alert("Please select a stage and enter the quantity.");
+      return;
+    }
+
+    if (editingLabourId) {
+      updateLabourInVariant(selectedVariantId, editingLabourId, {
+        stageId: labourFormData.stageId,
+        quantity: parseFloat(labourFormData.quantity)
+      });
+    } else {
+      addLabourToVariant(selectedVariantId, labourFormData.stageId, parseFloat(labourFormData.quantity));
+    }
+
+    setEditingLabourId(null);
+    setIsAddingLabour(false);
+    setLabourFormData({ stageId: '', quantity: '' });
   };
 
   const calculateTotalLabour = () => {
-    return manpowerRates.reduce((sum, rate) => {
-      const override = labourAllocations[rate.id];
-      const cost = (override !== undefined && override !== '') ? parseFloat(override) : rate.unitCost;
-      return sum + cost;
+    if (!variant || !variant.labourAllocations || !Array.isArray(variant.labourAllocations)) return '0.00';
+    return variant.labourAllocations.reduce((sum, alloc) => {
+      const rate = manpowerRates.find(r => r.id === alloc.stageId || r.stageId === alloc.stageId);
+      const unitCost = rate ? rate.unitCost : 0;
+      return sum + (alloc.quantity * unitCost);
     }, 0).toFixed(2);
   };
 
   /* ----- UTILITY ACTIONS ----- */
-  const handleUtilityChange = (utilId, value) => {
-    setUtilityAllocations(prev => {
-      const newAllocs = { ...prev };
-      newAllocs[utilId] = value;
-      return newAllocs;
+  const handleEditUtilityClick = (alloc) => {
+    setEditingUtilityId(alloc._id || alloc.id);
+    setUtilityFormData({
+      utilityId: alloc.utilityId,
+      quantity: alloc.quantity,
     });
-    setIsUtilitySaved(false);
+    setIsAddingUtility(false);
+  };
+
+  const handleDeleteUtilityClick = (id) => {
+    if (confirm('Are you sure you want to remove this utility allocation?')) {
+      deleteUtilityFromVariant(selectedVariantId, id);
+    }
   };
 
   const handleSaveUtility = () => {
-    const payload = {};
-    Object.entries(utilityAllocations).forEach(([k, v]) => {
-      if (v !== '') payload[k] = parseFloat(v);
-    });
-    updateVariantUtilityAllocations(selectedVariantId, payload);
-    setIsUtilitySaved(true);
-    setTimeout(() => setIsUtilitySaved(false), 3000);
+    if (!utilityFormData.utilityId || utilityFormData.quantity === '') {
+      alert("Please select a utility and enter the quantity.");
+      return;
+    }
+
+    if (editingUtilityId) {
+      updateUtilityInVariant(selectedVariantId, editingUtilityId, {
+        utilityId: utilityFormData.utilityId,
+        quantity: parseFloat(utilityFormData.quantity)
+      });
+    } else {
+      addUtilityToVariant(selectedVariantId, utilityFormData.utilityId, parseFloat(utilityFormData.quantity));
+    }
+
+    setEditingUtilityId(null);
+    setIsAddingUtility(false);
+    setUtilityFormData({ utilityId: '', quantity: '' });
   };
 
   const calculateTotalUtility = () => {
-    return utilityRates.reduce((sum, rate) => {
-      const override = utilityAllocations[rate.id];
-      const cost = (override !== undefined && override !== '') ? parseFloat(override) : rate.unitCost;
-      return sum + cost;
+    if (!variant || !variant.utilityAllocations || !Array.isArray(variant.utilityAllocations)) return '0.00';
+    return variant.utilityAllocations.reduce((sum, alloc) => {
+      const rate = utilityRates.find(r => r.id === alloc.utilityId || r.utilityId === alloc.utilityId);
+      const unitCost = rate ? rate.unitCost : 0;
+      return sum + (alloc.quantity * unitCost);
     }, 0).toFixed(2);
   };
 
@@ -352,37 +369,145 @@ const CostConfig = () => {
             </div>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
-            {manpowerRates.map(rate => {
-              const allocatedVal = labourAllocations[rate.id];
-              const lineCost = (allocatedVal !== undefined && allocatedVal !== '') ? parseFloat(allocatedVal) : 0;
-              return (
-                <div key={rate.id} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', background: 'var(--bg-primary)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <label style={{ margin: 0, fontWeight: '500', color: 'var(--text-primary)' }}>{rate.name}</label>
-                  </div>
-                  
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                    <input 
-                      type="number" step="0.01" min="0" placeholder={`Rate per pair`}
-                      value={allocatedVal !== undefined ? allocatedVal : ''}
-                      onChange={(e) => handleLabourChange(rate.id, e.target.value)}
-                      style={{ flex: 1 }}
-                    />
-                    <div style={{ width: '80px', textAlign: 'right', fontWeight: 'bold' }}>
-                      LKR {lineCost.toFixed(2)}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+          <div className="table-container">
+            <table style={{ width: '100%', minWidth: '400px' }}>
+              <thead>
+                <tr>
+                  <th>Stage</th>
+                  <th>Baseline Rate</th>
+                  <th>Allocated Qty/Hours</th>
+                  <th>Total Cost (LKR)</th>
+                  <th style={{ textAlign: 'right' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(!variant || !variant.labourAllocations || variant.labourAllocations.length === 0) && !isAddingLabour && (
+                  <tr>
+                    <td colSpan="5" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
+                      No labour stages allocated.
+                    </td>
+                  </tr>
+                )}
+
+                {variant && variant.labourAllocations && variant.labourAllocations.map(alloc => {
+                  const rateObj = manpowerRates.find(r => r.id === alloc.stageId || r.stageId === alloc.stageId);
+                  const isEditing = editingLabourId === alloc._id || editingLabourId === alloc.id;
+                  const unitCost = rateObj ? rateObj.unitCost : 0;
+                  const name = rateObj ? rateObj.name : alloc.stageId;
+                  const total = alloc.quantity * unitCost;
+
+                  return (
+                    <React.Fragment key={alloc._id || alloc.id}>
+                      {isEditing ? (
+                        <tr style={{ backgroundColor: 'rgba(99, 102, 241, 0.1)' }}>
+                          <td>
+                            <select
+                              value={labourFormData.stageId}
+                              onChange={e => setLabourFormData({ ...labourFormData, stageId: e.target.value })}
+                              style={{ width: '100%' }}
+                            >
+                              <option value="">-- Select Stage --</option>
+                              {manpowerRates.map(mr => (
+                                <option key={mr.id || mr._id} value={mr.id || mr._id}>{mr.name}</option>
+                              ))}
+                            </select>
+                          </td>
+                          <td>LKR {unitCost.toFixed(2)}</td>
+                          <td>
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={labourFormData.quantity}
+                              onChange={e => setLabourFormData({ ...labourFormData, quantity: e.target.value })}
+                              style={{ width: '100%' }}
+                            />
+                          </td>
+                          <td style={{ fontWeight: 'bold' }}>
+                            LKR {((parseFloat(labourFormData.quantity) || 0) * unitCost).toFixed(2)}
+                          </td>
+                          <td style={{ textAlign: 'right' }}>
+                            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                              <button className="btn btn-primary" style={{ padding: '0.5rem' }} onClick={handleSaveLabour}><Save size={16} /></button>
+                              <button className="btn btn-secondary" style={{ padding: '0.5rem' }} onClick={() => setEditingLabourId(null)}><X size={16} /></button>
+                            </div>
+                          </td>
+                        </tr>
+                      ) : (
+                        <tr>
+                          <td style={{ fontWeight: '500' }}>{name}</td>
+                          <td>LKR {unitCost.toFixed(2)}</td>
+                          <td>{alloc.quantity}</td>
+                          <td style={{ fontWeight: 'bold' }}>LKR {total.toFixed(2)}</td>
+                          <td style={{ textAlign: 'right' }}>
+                            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                              <button onClick={() => handleEditLabourClick(alloc)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', outline: 'none' }}><Edit2 size={18} /></button>
+                              <button onClick={() => handleDeleteLabourClick(alloc._id || alloc.id)} style={{ background: 'none', border: 'none', color: 'var(--danger-color)', cursor: 'pointer', outline: 'none' }}><Trash2 size={18} /></button>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
+
+                {isAddingLabour && (
+                  <tr style={{ backgroundColor: 'rgba(99, 102, 241, 0.1)' }}>
+                    <td>
+                      <select
+                        value={labourFormData.stageId}
+                        onChange={e => setLabourFormData({ ...labourFormData, stageId: e.target.value })}
+                        style={{ width: '100%' }}
+                      >
+                        <option value="">-- Select Stage --</option>
+                        {manpowerRates.map(mr => (
+                          <option key={mr.id || mr._id} value={mr.id || mr._id}>{mr.name}</option>
+                        ))}
+                      </select>
+                    </td>
+                    <td>
+                      LKR {(() => {
+                        const selected = manpowerRates.find(mr => mr.id === labourFormData.stageId || mr._id === labourFormData.stageId);
+                        return selected ? selected.unitCost.toFixed(2) : '0.00';
+                      })()}
+                    </td>
+                    <td>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        placeholder="Hours/Qty"
+                        value={labourFormData.quantity}
+                        onChange={e => setLabourFormData({ ...labourFormData, quantity: e.target.value })}
+                        style={{ width: '100%' }}
+                      />
+                    </td>
+                    <td style={{ fontWeight: 'bold' }}>
+                      LKR {(() => {
+                        const selected = manpowerRates.find(mr => mr.id === labourFormData.stageId || mr._id === labourFormData.stageId);
+                        const rate = selected ? selected.unitCost : 0;
+                        return ((parseFloat(labourFormData.quantity) || 0) * rate).toFixed(2);
+                      })()}
+                    </td>
+                    <td style={{ textAlign: 'right' }}>
+                      <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                        <button className="btn btn-primary" style={{ padding: '0.5rem', backgroundColor: 'var(--success-color)' }} onClick={handleSaveLabour}><Save size={16} /></button>
+                        <button className="btn btn-secondary" style={{ padding: '0.5rem' }} onClick={() => setIsAddingLabour(false)}><X size={16} /></button>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid var(--border-color)', paddingTop: '1.5rem' }}>
-            <button className="btn btn-primary" onClick={handleSaveLabour}>
-              {isLabourSaved ? 'Saved!' : <><Save size={18} /> Update Labour Allocations</>}
-            </button>
-          </div>
+          {!isAddingLabour && !editingLabourId && (
+            <div style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'center' }}>
+              <button className="btn btn-primary" onClick={() => { setLabourFormData({ stageId: '', quantity: '' }); setIsAddingLabour(true); }}>
+                <Plus size={18} /> Add Stage
+              </button>
+            </div>
+          )}
         </div>
 
         {/* SECTION: UTILITY */}
@@ -396,39 +521,146 @@ const CostConfig = () => {
             </div>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
-            {utilityRates.map(rate => {
-              const allocatedVal = utilityAllocations[rate.id];
-              const lineCost = (allocatedVal !== undefined && allocatedVal !== '') ? parseFloat(allocatedVal) : 0;
-              return (
-                <div key={rate.id} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', background: 'var(--bg-primary)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <label style={{ margin: 0, fontWeight: '500', color: 'var(--text-primary)' }}>{rate.name}</label>
-                  </div>
-                  
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                    <input 
-                      type="number" step="0.01" min="0" placeholder={`Rate per pair`}
-                      value={allocatedVal !== undefined ? allocatedVal : ''}
-                      onChange={(e) => handleUtilityChange(rate.id, e.target.value)}
-                      style={{ flex: 1 }}
-                    />
-                    <div style={{ width: '80px', textAlign: 'right', fontWeight: 'bold' }}>
-                      LKR {lineCost.toFixed(2)}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+          <div className="table-container">
+            <table style={{ width: '100%', minWidth: '400px' }}>
+              <thead>
+                <tr>
+                  <th>Utility</th>
+                  <th>Baseline Rate</th>
+                  <th>Allocated Qty</th>
+                  <th>Total Cost (LKR)</th>
+                  <th style={{ textAlign: 'right' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(!variant || !variant.utilityAllocations || variant.utilityAllocations.length === 0) && !isAddingUtility && (
+                  <tr>
+                    <td colSpan="5" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
+                      No utilities allocated.
+                    </td>
+                  </tr>
+                )}
+
+                {variant && variant.utilityAllocations && variant.utilityAllocations.map(alloc => {
+                  const rateObj = utilityRates.find(r => r.id === alloc.utilityId || r.utilityId === alloc.utilityId);
+                  const isEditing = editingUtilityId === alloc._id || editingUtilityId === alloc.id;
+                  const unitCost = rateObj ? rateObj.unitCost : 0;
+                  const name = rateObj ? rateObj.name : alloc.utilityId;
+                  const total = alloc.quantity * unitCost;
+
+                  return (
+                    <React.Fragment key={alloc._id || alloc.id}>
+                      {isEditing ? (
+                        <tr style={{ backgroundColor: 'rgba(16, 185, 129, 0.1)' }}>
+                          <td>
+                            <select
+                              value={utilityFormData.utilityId}
+                              onChange={e => setUtilityFormData({ ...utilityFormData, utilityId: e.target.value })}
+                              style={{ width: '100%' }}
+                            >
+                              <option value="">-- Select Utility --</option>
+                              {utilityRates.map(ur => (
+                                <option key={ur.id || ur._id} value={ur.id || ur._id}>{ur.name}</option>
+                              ))}
+                            </select>
+                          </td>
+                          <td>LKR {unitCost.toFixed(2)}</td>
+                          <td>
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={utilityFormData.quantity}
+                              onChange={e => setUtilityFormData({ ...utilityFormData, quantity: e.target.value })}
+                              style={{ width: '100%' }}
+                            />
+                          </td>
+                          <td style={{ fontWeight: 'bold' }}>
+                            LKR {((parseFloat(utilityFormData.quantity) || 0) * unitCost).toFixed(2)}
+                          </td>
+                          <td style={{ textAlign: 'right' }}>
+                            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                              <button className="btn btn-primary" style={{ padding: '0.5rem' }} onClick={handleSaveUtility}><Save size={16} /></button>
+                              <button className="btn btn-secondary" style={{ padding: '0.5rem' }} onClick={() => setEditingUtilityId(null)}><X size={16} /></button>
+                            </div>
+                          </td>
+                        </tr>
+                      ) : (
+                        <tr>
+                          <td style={{ fontWeight: '500' }}>{name}</td>
+                          <td>LKR {unitCost.toFixed(2)}</td>
+                          <td>{alloc.quantity}</td>
+                          <td style={{ fontWeight: 'bold' }}>LKR {total.toFixed(2)}</td>
+                          <td style={{ textAlign: 'right' }}>
+                            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                              <button onClick={() => handleEditUtilityClick(alloc)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', outline: 'none' }}><Edit2 size={18} /></button>
+                              <button onClick={() => handleDeleteUtilityClick(alloc._id || alloc.id)} style={{ background: 'none', border: 'none', color: 'var(--danger-color)', cursor: 'pointer', outline: 'none' }}><Trash2 size={18} /></button>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
+
+                {isAddingUtility && (
+                  <tr style={{ backgroundColor: 'rgba(16, 185, 129, 0.1)' }}>
+                    <td>
+                      <select
+                        value={utilityFormData.utilityId}
+                        onChange={e => setUtilityFormData({ ...utilityFormData, utilityId: e.target.value })}
+                        style={{ width: '100%' }}
+                      >
+                        <option value="">-- Select Utility --</option>
+                        {utilityRates.map(ur => (
+                          <option key={ur.id || ur._id} value={ur.id || ur._id}>{ur.name}</option>
+                        ))}
+                      </select>
+                    </td>
+                    <td>
+                      LKR {(() => {
+                        const selected = utilityRates.find(ur => ur.id === utilityFormData.utilityId || ur._id === utilityFormData.utilityId);
+                        return selected ? selected.unitCost.toFixed(2) : '0.00';
+                      })()}
+                    </td>
+                    <td>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        placeholder="Quantity"
+                        value={utilityFormData.quantity}
+                        onChange={e => setUtilityFormData({ ...utilityFormData, quantity: e.target.value })}
+                        style={{ width: '100%' }}
+                      />
+                    </td>
+                    <td style={{ fontWeight: 'bold' }}>
+                      LKR {(() => {
+                        const selected = utilityRates.find(ur => ur.id === utilityFormData.utilityId || ur._id === utilityFormData.utilityId);
+                        const rate = selected ? selected.unitCost : 0;
+                        return ((parseFloat(utilityFormData.quantity) || 0) * rate).toFixed(2);
+                      })()}
+                    </td>
+                    <td style={{ textAlign: 'right' }}>
+                      <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                        <button className="btn btn-primary" style={{ padding: '0.5rem', backgroundColor: 'var(--success-color)' }} onClick={handleSaveUtility}><Save size={16} /></button>
+                        <button className="btn btn-secondary" style={{ padding: '0.5rem' }} onClick={() => setIsAddingUtility(false)}><X size={16} /></button>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid var(--border-color)', paddingTop: '1.5rem' }}>
-            <button className="btn btn-primary" onClick={handleSaveUtility}>
-              {isUtilitySaved ? 'Saved!' : <><Save size={18} /> Update Utility Allocations</>}
-            </button>
-          </div>
+          {!isAddingUtility && !editingUtilityId && (
+            <div style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'center' }}>
+              <button className="btn btn-primary" onClick={() => { setUtilityFormData({ utilityId: '', quantity: '' }); setIsAddingUtility(true); }}>
+                <Plus size={18} /> Add Utility
+              </button>
+            </div>
+          )}
         </div>
-
       </div>
     </div>
   );

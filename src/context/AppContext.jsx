@@ -24,26 +24,74 @@ const initialVariants = [
   { 
     id: 'running_basic', 
     name: 'Running Shoe - Basic', 
-    labourAllocations: { topCut: 0.3, topFinish: 0.2, mount: 0.4, sole: 0.3, sockline: 0.2, sprayFinish: 0.2 }, 
-    utilityAllocations: { electricity: 10, water: 2, steam: 0, air: 5 }
+    labourAllocations: [
+      { stageId: 'topCut', quantity: 0.3 },
+      { stageId: 'topFinish', quantity: 0.2 },
+      { stageId: 'mount', quantity: 0.4 },
+      { stageId: 'sole', quantity: 0.3 },
+      { stageId: 'sockline', quantity: 0.2 },
+      { stageId: 'sprayFinish', quantity: 0.2 }
+    ], 
+    utilityAllocations: [
+      { utilityId: 'electricity', quantity: 10 },
+      { utilityId: 'water', quantity: 2 },
+      { utilityId: 'steam', quantity: 0 },
+      { utilityId: 'air', quantity: 5 }
+    ]
   },
   { 
     id: 'running_pro', 
     name: 'Running Shoe - Pro', 
-    labourAllocations: { topCut: 0.5, topFinish: 0.3, mount: 0.5, sole: 0.4, sockline: 0.3, sprayFinish: 0.3 }, 
-    utilityAllocations: { electricity: 15, water: 3, steam: 1, air: 6 }
+    labourAllocations: [
+      { stageId: 'topCut', quantity: 0.5 },
+      { stageId: 'topFinish', quantity: 0.3 },
+      { stageId: 'mount', quantity: 0.5 },
+      { stageId: 'sole', quantity: 0.4 },
+      { stageId: 'sockline', quantity: 0.3 },
+      { stageId: 'sprayFinish', quantity: 0.3 }
+    ], 
+    utilityAllocations: [
+      { utilityId: 'electricity', quantity: 15 },
+      { utilityId: 'water', quantity: 3 },
+      { utilityId: 'steam', quantity: 1 },
+      { utilityId: 'air', quantity: 6 }
+    ]
   },
   { 
     id: 'formal_leather', 
     name: 'Formal Leather Shoe', 
-    labourAllocations: { topCut: 0.8, topFinish: 0.6, mount: 0.8, sole: 0.5, sockline: 0.6, sprayFinish: 0.5 }, 
-    utilityAllocations: { electricity: 18, water: 1, steam: 0, air: 4 }
+    labourAllocations: [
+      { stageId: 'topCut', quantity: 0.8 },
+      { stageId: 'topFinish', quantity: 0.6 },
+      { stageId: 'mount', quantity: 0.8 },
+      { stageId: 'sole', quantity: 0.5 },
+      { stageId: 'sockline', quantity: 0.6 },
+      { stageId: 'sprayFinish', quantity: 0.5 }
+    ], 
+    utilityAllocations: [
+      { utilityId: 'electricity', quantity: 18 },
+      { utilityId: 'water', quantity: 1 },
+      { utilityId: 'steam', quantity: 0 },
+      { utilityId: 'air', quantity: 4 }
+    ]
   },
   { 
     id: 'casual_canvas', 
     name: 'Casual Canvas', 
-    labourAllocations: { topCut: 0.2, topFinish: 0.1, mount: 0.3, sole: 0.2, sockline: 0.1, sprayFinish: 0.2 }, 
-    utilityAllocations: { electricity: 8, water: 1, steam: 0, air: 3 }
+    labourAllocations: [
+      { stageId: 'topCut', quantity: 0.2 },
+      { stageId: 'topFinish', quantity: 0.1 },
+      { stageId: 'mount', quantity: 0.3 },
+      { stageId: 'sole', quantity: 0.2 },
+      { stageId: 'sockline', quantity: 0.1 },
+      { stageId: 'sprayFinish', quantity: 0.2 }
+    ], 
+    utilityAllocations: [
+      { utilityId: 'electricity', quantity: 8 },
+      { utilityId: 'water', quantity: 1 },
+      { utilityId: 'steam', quantity: 0 },
+      { utilityId: 'air', quantity: 3 }
+    ]
   }
 ];
 
@@ -269,45 +317,77 @@ export const AppProvider = ({ children }) => {
     }
   };
 
+  const addLabourToVariant = async (variantId, stageId, quantity) => {
+    try {
+      const res = await api.post(`/variants/${variantId}/labour`, { stageId, quantity });
+      setVariants(prev => prev.map(v => (v._id === variantId || v.id === variantId) ? res.data : v));
+    } catch (err) {
+      console.error('Error adding labour allocation:', err);
+    }
+  };
+
+  const updateLabourInVariant = async (variantId, labourId, updatedFields) => {
+    try {
+      const res = await api.put(`/variants/${variantId}/labour/${labourId}`, updatedFields);
+      setVariants(prev => prev.map(v => (v._id === variantId || v.id === variantId) ? res.data : v));
+    } catch (err) {
+      console.error('Error updating labour allocation:', err);
+    }
+  };
+
+  const deleteLabourFromVariant = async (variantId, labourId) => {
+    try {
+      const res = await api.delete(`/variants/${variantId}/labour/${labourId}`);
+      setVariants(prev => prev.map(v => (v._id === variantId || v.id === variantId) ? res.data : v));
+    } catch (err) {
+      console.error('Error deleting labour allocation:', err);
+    }
+  };
+
+  const addUtilityToVariant = async (variantId, utilityId, quantity) => {
+    try {
+      const res = await api.post(`/variants/${variantId}/utility`, { utilityId, quantity });
+      setVariants(prev => prev.map(v => (v._id === variantId || v.id === variantId) ? res.data : v));
+    } catch (err) {
+      console.error('Error adding utility allocation:', err);
+    }
+  };
+
+  const updateUtilityInVariant = async (variantId, utilityId, updatedFields) => {
+    try {
+      const res = await api.put(`/variants/${variantId}/utility/${utilityId}`, updatedFields);
+      setVariants(prev => prev.map(v => (v._id === variantId || v.id === variantId) ? res.data : v));
+    } catch (err) {
+      console.error('Error updating utility allocation:', err);
+    }
+  };
+
+  const deleteUtilityFromVariant = async (variantId, utilityId) => {
+    try {
+      const res = await api.delete(`/variants/${variantId}/utility/${utilityId}`);
+      setVariants(prev => prev.map(v => (v._id === variantId || v.id === variantId) ? res.data : v));
+    } catch (err) {
+      console.error('Error deleting utility allocation:', err);
+    }
+  };
+
   const getVariantLabourTotal = (variantId) => {
     const variant = variants.find(v => v._id === variantId || v.id === variantId);
-    
-    // Check if variant has allocations
-    if (!variant || !variant.labourAllocations || Object.keys(variant.labourAllocations).length === 0) {
-      if (variant && variant.labourAllocations instanceof Map && variant.labourAllocations.size > 0) {
-        // Continue, it has map size > 0
-      } else {
-        return manpowerRates.reduce((acc, rate) => acc + rate.unitCost, 0);
-      }
-    }
-    
-    const allocations = variant.labourAllocations instanceof Map ? Object.fromEntries(variant.labourAllocations) : variant.labourAllocations;
-
-    return manpowerRates.reduce((acc, rate) => {
-      const val = allocations[rate.id || rate._id];
-      const cost = (val !== undefined && val !== null && val !== '') ? parseFloat(val) : rate.unitCost;
-      return acc + cost;
+    if (!variant || !variant.labourAllocations || !Array.isArray(variant.labourAllocations)) return 0;
+    return variant.labourAllocations.reduce((sum, alloc) => {
+      const rate = manpowerRates.find(r => r.id === alloc.stageId || r.stageId === alloc.stageId);
+      const unitCost = rate ? rate.unitCost : 0;
+      return sum + (alloc.quantity * unitCost);
     }, 0);
   };
 
   const getVariantUtilityTotal = (variantId) => {
     const variant = variants.find(v => v._id === variantId || v.id === variantId);
-    
-    // Check if variant has allocations
-    if (!variant || !variant.utilityAllocations || Object.keys(variant.utilityAllocations).length === 0) {
-      if (variant && variant.utilityAllocations instanceof Map && variant.utilityAllocations.size > 0) {
-        // Continue
-      } else {
-        return utilityRates.reduce((acc, rate) => acc + rate.unitCost, 0);
-      }
-    }
-
-    const allocations = variant.utilityAllocations instanceof Map ? Object.fromEntries(variant.utilityAllocations) : variant.utilityAllocations;
-
-    return utilityRates.reduce((acc, rate) => {
-      const val = allocations[rate.id || rate._id];
-      const cost = (val !== undefined && val !== null && val !== '') ? parseFloat(val) : rate.unitCost;
-      return acc + cost;
+    if (!variant || !variant.utilityAllocations || !Array.isArray(variant.utilityAllocations)) return 0;
+    return variant.utilityAllocations.reduce((sum, alloc) => {
+      const rate = utilityRates.find(r => r.id === alloc.utilityId || r.utilityId === alloc.utilityId);
+      const unitCost = rate ? rate.unitCost : 0;
+      return sum + (alloc.quantity * unitCost);
     }, 0);
   };
 
@@ -467,6 +547,12 @@ export const AppProvider = ({ children }) => {
       deleteUtilityRate,
       updateVariantLabourAllocations,
       updateVariantUtilityAllocations,
+      addLabourToVariant,
+      updateLabourInVariant,
+      deleteLabourFromVariant,
+      addUtilityToVariant,
+      updateUtilityInVariant,
+      deleteUtilityFromVariant,
       getVariantLabourTotal,
       getVariantUtilityTotal,
       addRawMaterial,

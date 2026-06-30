@@ -1,6 +1,6 @@
 import React from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
-import { Calculator, LogOut, Settings, Factory, BarChart3, Box, Database, Hammer, Zap, Layout } from 'lucide-react';
+import { Calculator, LogOut, Factory, Box, Database, Hammer, Zap, Layout } from 'lucide-react';
 
 const DashboardLayout = () => {
   const navigate = useNavigate();
@@ -106,20 +106,7 @@ const DashboardLayout = () => {
             <Zap size={20} />
             Utility Rates
           </NavLink>
-          <NavLink 
-            to="/settings" 
-            style={({ isActive }) => ({
-              display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem 1rem', borderRadius: '8px',
-              textDecoration: 'none',
-              color: isActive ? 'white' : 'var(--text-secondary)',
-              backgroundColor: isActive ? 'var(--accent-color)' : 'transparent',
-              transition: 'all 0.2s',
-              fontWeight: '500'
-            })}
-          >
-            <Settings size={20} />
-            Data Settings
-          </NavLink>
+
         </nav>
 
         <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1.5rem', marginTop: 'auto' }}>

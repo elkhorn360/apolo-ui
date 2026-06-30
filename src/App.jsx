@@ -2,7 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import Login from './pages/Login';
 import DashboardLayout from './layout/DashboardLayout';
 import CostEstimation from './pages/CostEstimation';
-import Settings from './pages/Settings';
+
 import CostConfig from './pages/CostConfig';
 import RawMaterials from './pages/RawMaterials';
 import ManpowerConfig from './pages/ManpowerConfig';
@@ -40,7 +40,7 @@ function App() {
             <Route path="cost-config" element={<CostConfig />} />
             <Route path="manpower" element={<ManpowerConfig />} />
             <Route path="utilities" element={<UtilityRates />} />
-            <Route path="settings" element={<Settings />} />
+
           </Route>
         </Routes>
       </Router>

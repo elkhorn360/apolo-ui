@@ -3,10 +3,9 @@ import { DollarSign, Zap, Hammer, Box, Component, Settings2, Layout, Download } 
 import { useAppContext } from '../context/AppContext';
 
 const CostEstimation = () => {
-  const { variants, sizes, calculateBaseMaterials, getVariantLabourTotal, getVariantUtilityTotal, manpowerRates, utilityRates } = useAppContext();
+  const { variants, calculateBaseMaterials, getVariantLabourTotal, getVariantUtilityTotal, manpowerRates, utilityRates } = useAppContext();
   
   const [selectedVariantId, setSelectedVariantId] = useState('');
-  const [selectedSize, setSelectedSize] = useState(sizes[2]?.size || '');
   
   React.useEffect(() => {
     if (variants.length > 0 && !selectedVariantId) {
@@ -19,7 +18,7 @@ const CostEstimation = () => {
   const [utilityOverrides, setUtilityOverrides] = useState({});
 
   const variant = variants.find(v => (v._id === selectedVariantId || v.id === selectedVariantId)) || variants[0];
-  const sizeFactor = sizes.find(s => s.size === selectedSize)?.multiplier || 1.0;
+  const sizeFactor = 1.0;
 
   // Calculate dynamic base materials from Context (BOM)
   const baseMaterials = variant ? calculateBaseMaterials(variant._id || variant.id) : { leather: 0, sole: 0, adhesives: 0, spray: 0, threads: 0, other: 0 };
@@ -31,49 +30,27 @@ const CostEstimation = () => {
 
   // Calculate costs
   const materialCost = Object.keys(baseMaterials).reduce((acc, key) => acc + calculateMaterialPart(key), 0);
-  const calculateLabourPart = (rateId) => {
-    const rateObj = manpowerRates.find(r => r.id === rateId || r._id === rateId);
-    
-    // 1. Manually overridden in Cost Estimation UI currently
-    if (labourOverrides[rateId] !== undefined && labourOverrides[rateId] !== '') {
-      return parseFloat(labourOverrides[rateId]);
+  // Calculate labour cost from overrides or variant allocations
+  const calculateLabourPart = (alloc) => {
+    const rateObj = manpowerRates.find(r => r.id === alloc.stageId || r.stageId === alloc.stageId);
+    if (labourOverrides[alloc.stageId] !== undefined && labourOverrides[alloc.stageId] !== '') {
+      return parseFloat(labourOverrides[alloc.stageId]);
     }
-    
-    // 2. Fallback to model's configuration override OR global value
-    let modelOverride = undefined;
-    if (variant && variant.labourAllocations) {
-      const allocations = variant.labourAllocations instanceof Map ? Object.fromEntries(variant.labourAllocations) : variant.labourAllocations;
-      modelOverride = allocations[rateId];
-    }
-    
-    if (modelOverride !== undefined && modelOverride !== null && modelOverride !== '') {
-      return parseFloat(modelOverride);
-    }
-
-    // 3. Global manpower value
-    return rateObj ? rateObj.unitCost : 0;
+    return alloc.quantity * (rateObj ? rateObj.unitCost : 0);
   };
 
-  const labourCost = manpowerRates.reduce((acc, rate) => acc + calculateLabourPart(rate.id || rate._id), 0);
+  const labourCost = (variant?.labourAllocations || []).reduce((acc, alloc) => acc + calculateLabourPart(alloc), 0);
 
-  // Calculate dynamic utility from Context
-  const calculateUtilityPart = (rateId) => {
-    const rateObj = utilityRates.find(r => r.id === rateId || r._id === rateId);
-    if (utilityOverrides[rateId] !== undefined && utilityOverrides[rateId] !== '') {
-      return parseFloat(utilityOverrides[rateId]);
+  // Calculate dynamic utility from overrides or variant allocations
+  const calculateUtilityPart = (alloc) => {
+    const rateObj = utilityRates.find(r => r.id === alloc.utilityId || r.utilityId === alloc.utilityId);
+    if (utilityOverrides[alloc.utilityId] !== undefined && utilityOverrides[alloc.utilityId] !== '') {
+      return parseFloat(utilityOverrides[alloc.utilityId]);
     }
-    let modelOverride = undefined;
-    if (variant && variant.utilityAllocations) {
-      const allocations = variant.utilityAllocations instanceof Map ? Object.fromEntries(variant.utilityAllocations) : variant.utilityAllocations;
-      modelOverride = allocations[rateId];
-    }
-    if (modelOverride !== undefined && modelOverride !== null && modelOverride !== '') {
-      return parseFloat(modelOverride);
-    }
-    return rateObj ? rateObj.unitCost : 0;
+    return alloc.quantity * (rateObj ? rateObj.unitCost : 0);
   };
 
-  const energyCost = utilityRates.reduce((acc, rate) => acc + calculateUtilityPart(rate.id || rate._id), 0);
+  const energyCost = (variant?.utilityAllocations || []).reduce((acc, alloc) => acc + calculateUtilityPart(alloc), 0);
   
   const totalCost = materialCost + labourCost + energyCost;
 
@@ -95,24 +72,16 @@ const CostEstimation = () => {
 
       const baseMats = calculateBaseMaterials(v._id || v.id);
       
-      const lCost = manpowerRates.reduce((acc, rate) => {
-        let modelOverride = undefined;
-        if (v.labourAllocations) {
-          const allocs = v.labourAllocations instanceof Map ? Object.fromEntries(v.labourAllocations) : v.labourAllocations;
-          modelOverride = allocs[rate.id || rate._id];
-        }
-        const val = modelOverride !== undefined && modelOverride !== null && modelOverride !== '' ? parseFloat(modelOverride) : rate.unitCost;
-        return acc + val;
+      const lCost = (v.labourAllocations || []).reduce((acc, alloc) => {
+        const rate = manpowerRates.find(r => r.id === alloc.stageId || r.stageId === alloc.stageId);
+        const unitCost = rate ? rate.unitCost : 0;
+        return acc + (alloc.quantity * unitCost);
       }, 0);
       
-      const uCost = utilityRates.reduce((acc, rate) => {
-        let modelOverride = undefined;
-        if (v.utilityAllocations) {
-          const allocs = v.utilityAllocations instanceof Map ? Object.fromEntries(v.utilityAllocations) : v.utilityAllocations;
-          modelOverride = allocs[rate.id || rate._id];
-        }
-        const val = modelOverride !== undefined && modelOverride !== null && modelOverride !== '' ? parseFloat(modelOverride) : rate.unitCost;
-        return acc + val;
+      const uCost = (v.utilityAllocations || []).reduce((acc, alloc) => {
+        const rate = utilityRates.find(r => r.id === alloc.utilityId || r.utilityId === alloc.utilityId);
+        const unitCost = rate ? rate.unitCost : 0;
+        return acc + (alloc.quantity * unitCost);
       }, 0);
 
       variantSizes.forEach(s => {
@@ -157,19 +126,18 @@ const CostEstimation = () => {
     );
   };
 
-  const renderLabourInput = (key, label, value, OverrideValue) => {
-    const rateObj = manpowerRates.find(r => r.id === key || r._id === key);
-    const defaultRate = rateObj ? rateObj.unitCost : 0;
+  const renderLabourInput = (key, label, value, OverrideValue, quantity, unitCost) => {
+    const defaultCost = quantity * unitCost;
 
     return (
       <div style={{ marginBottom: '1rem' }} key={key}>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
-          <label style={{ margin: 0 }}>{label}</label>
+          <label style={{ margin: 0 }}>{label} <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>({quantity} hrs/qty × LKR {unitCost.toFixed(2)})</span></label>
           <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>LKR {value.toFixed(2)}</span>
         </div>
         <input 
           type="number" 
-          placeholder={`Base: LKR ${defaultRate.toFixed(2)}`} 
+          placeholder={`Base: LKR ${defaultCost.toFixed(2)}`} 
           value={OverrideValue}
           onChange={(e) => setLabourOverrides(prev => ({ ...prev, [key]: e.target.value }))}
           step="0.01"
@@ -180,19 +148,18 @@ const CostEstimation = () => {
     );
   };
 
-  const renderUtilityInput = (key, label, value, OverrideValue) => {
-    const rateObj = utilityRates.find(r => r.id === key || r._id === key);
-    const defaultRate = rateObj ? rateObj.unitCost : 0;
+  const renderUtilityInput = (key, label, value, OverrideValue, quantity, unitCost) => {
+    const defaultCost = quantity * unitCost;
 
     return (
       <div style={{ marginBottom: '1rem' }} key={key}>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
-          <label style={{ margin: 0 }}>{label}</label>
+          <label style={{ margin: 0 }}>{label} <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>({quantity} × LKR {unitCost.toFixed(2)})</span></label>
           <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>LKR {value.toFixed(2)}</span>
         </div>
         <input 
           type="number" 
-          placeholder={`Base: LKR ${defaultRate.toFixed(2)}`} 
+          placeholder={`Base: LKR ${defaultCost.toFixed(2)}`} 
           value={OverrideValue}
           onChange={(e) => setUtilityOverrides(prev => ({ ...prev, [key]: e.target.value }))}
           step="0.01"
@@ -213,7 +180,7 @@ const CostEstimation = () => {
             <Settings2 color="var(--accent-color)" />
             Cost Estimation Module
           </h1>
-          <p style={{ color: 'var(--text-secondary)' }}>Configure product model and size to generate manufacturing cost estimates.</p>
+          <p style={{ color: 'var(--text-secondary)' }}>Select a product variant to generate manufacturing cost estimates.</p>
         </div>
         <button className="btn btn-primary" onClick={handleExportAll} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <Download size={18} />
@@ -236,22 +203,37 @@ const CostEstimation = () => {
               {variants.map(v => <option key={v._id || v.id} value={v._id || v.id}>{v.modelName} - {v.name}</option>)}
             </select>
           </div>
-            
-            <div style={{ marginTop: '1rem' }}>
-              <label>Shoe Size (Scaling Factor)</label>
-              <select 
-                value={selectedSize} 
-                onChange={(e) => setSelectedSize(e.target.value)}
-              >
-                {sizes.map(s => (
-                  <option key={s.size} value={s.size}>{s.size} (x{s.multiplier.toFixed(2)})</option>
-                ))}
-              </select>
-              <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
-                * Size affects raw material consumption and production time.
-              </p>
+
+          <div style={{ marginTop: '0.5rem' }}>
+            <label style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '0.5rem', display: 'block' }}>Available Sizes</label>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.5rem' }}>
+              {variant?.sizes && variant.sizes.length > 0 ? (
+                variant.sizes.map(sz => (
+                  <span
+                    key={sz}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: '0.3rem 0.75rem',
+                      borderRadius: '999px',
+                      background: 'linear-gradient(135deg, rgba(99,102,241,0.18), rgba(139,92,246,0.18))',
+                      border: '1px solid rgba(139,92,246,0.35)',
+                      color: 'var(--accent-color)',
+                      fontSize: '0.88rem',
+                      fontWeight: '600',
+                      letterSpacing: '0.03em'
+                    }}
+                  >
+                    EU {sz}
+                  </span>
+                ))
+              ) : (
+                <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>No sizes assigned to this variant.</span>
+              )}
             </div>
           </div>
+        </div>
 
         {/* Total Cost Summary */}
         <div className="glass-panel card" style={{ background: 'linear-gradient(145deg, rgba(30, 41, 59, 0.9), rgba(15, 23, 42, 0.9))' }}>
@@ -298,7 +280,7 @@ const CostEstimation = () => {
           </div>
           <div>
             <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
-              Configure base values in Material Config. Adjust here for custom batch costs overriding the {selectedSize} scaled values.
+              Configure base values in Material Config. Adjust here for custom batch cost overrides.
             </p>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
@@ -332,10 +314,11 @@ const CostEstimation = () => {
               </p>
               
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                {manpowerRates.map(rate => {
-                    const rId = rate._id || rate.id;
-                    const calculated = calculateLabourPart(rId);
-                    return renderLabourInput(rId, rate.name, calculated, labourOverrides[rId] !== undefined ? labourOverrides[rId] : '');
+                {(variant?.labourAllocations || []).map(alloc => {
+                    const rateObj = manpowerRates.find(r => r.id === alloc.stageId || r.stageId === alloc.stageId);
+                    const name = rateObj ? rateObj.name : alloc.stageId;
+                    const calculated = calculateLabourPart(alloc);
+                    return renderLabourInput(alloc.stageId, name, calculated, labourOverrides[alloc.stageId] !== undefined ? labourOverrides[alloc.stageId] : '', alloc.quantity, rateObj?.unitCost || 0);
                 })}
               </div>
 
@@ -362,10 +345,11 @@ const CostEstimation = () => {
               </p>
               
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                {utilityRates.map(rate => {
-                    const rId = rate._id || rate.id;
-                    const calculated = calculateUtilityPart(rId);
-                    return renderUtilityInput(rId, rate.name, calculated, utilityOverrides[rId] !== undefined ? utilityOverrides[rId] : '');
+                {(variant?.utilityAllocations || []).map(alloc => {
+                    const rateObj = utilityRates.find(r => r.id === alloc.utilityId || r.utilityId === alloc.utilityId);
+                    const name = rateObj ? rateObj.name : alloc.utilityId;
+                    const calculated = calculateUtilityPart(alloc);
+                    return renderUtilityInput(alloc.utilityId, name, calculated, utilityOverrides[alloc.utilityId] !== undefined ? utilityOverrides[alloc.utilityId] : '', alloc.quantity, rateObj?.unitCost || 0);
                 })}
               </div>
 

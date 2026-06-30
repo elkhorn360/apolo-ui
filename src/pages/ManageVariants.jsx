@@ -36,8 +36,8 @@ const ManageVariants = () => {
       modelCode: formData.modelCode,
       variantCode: formData.variantCode,
       sizes: formData.sizes,
-      labourAllocations: {},
-      utilityAllocations: {},
+      labourAllocations: [],
+      utilityAllocations: [],
       bom: []
     });
 
@@ -54,8 +54,8 @@ const ManageVariants = () => {
       variantCode: newVariantCode,
       sizes: newVariantSizes,
       bom: [],
-      labourAllocations: {},
-      utilityAllocations: {}
+      labourAllocations: [],
+      utilityAllocations: []
     });
     setAddingVariantToModel(null);
     setNewVariantName('');
@@ -123,12 +123,8 @@ const ManageVariants = () => {
       modelCode: v.modelCode,
       variantCode: '',
       bom: v.bom.map(b => ({ rawMaterial: b.rawMaterial?._id || b.rawMaterial, quantity: b.quantity })),
-      labourAllocations: v.labourAllocations instanceof Map
-        ? Object.fromEntries(v.labourAllocations)
-        : (v.labourAllocations || {}),
-      utilityAllocations: v.utilityAllocations instanceof Map
-        ? Object.fromEntries(v.utilityAllocations)
-        : (v.utilityAllocations || {})
+      labourAllocations: (v.labourAllocations || []).map(l => ({ stageId: l.stageId, quantity: l.quantity })),
+      utilityAllocations: (v.utilityAllocations || []).map(u => ({ utilityId: u.utilityId, quantity: u.quantity }))
     });
   };
 
@@ -495,7 +491,7 @@ const ManageVariants = () => {
                                <Box size={12} /> {variant.bom?.length || 0} Materials
                              </span>
                              <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                               <Hammer size={12} /> {Object.keys(variant.labourAllocations || {}).length} Labour Steps
+                               <Hammer size={12} /> {Array.isArray(variant.labourAllocations) ? variant.labourAllocations.length : 0} Labour Steps
                              </span>
                           </div>
                         </div>
