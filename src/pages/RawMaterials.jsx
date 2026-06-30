@@ -7,7 +7,8 @@ const CATEGORIES = [
   { id: 'sole', name: 'Soles & Bottoms' },
   { id: 'adhesives', name: 'Adhesives & Glues' },
   { id: 'spray', name: 'Sprays & Finishes' },
-  { id: 'threads', name: 'Sewing Threads' }
+  { id: 'threads', name: 'Sewing Threads' },
+  { id: 'packing_accessories', name: 'Packing & Accessories' }
 ];
 
 const INITIAL_FORM = { category: 'leather', name: '', unit: '', unitCost: '' };

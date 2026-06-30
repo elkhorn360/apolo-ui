@@ -517,7 +517,7 @@ export const AppProvider = ({ children }) => {
   };
 
   const calculateBaseMaterials = (variantId) => {
-    const defaultTotals = { leather: 0, sole: 0, adhesives: 0, spray: 0, threads: 0, other: 0 };
+    const defaultTotals = { leather: 0, sole: 0, adhesives: 0, spray: 0, threads: 0, packing_accessories: 0, other: 0 };
     const bom = getBomForVariant(variantId);
     
     return bom.reduce((acc, material) => {
